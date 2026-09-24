@@ -276,7 +276,7 @@ body.adm-editing img:hover{outline:2px dashed var(--red);outline-offset:2px;}
     <p class="gate-sub">Quelques informations avant d'accéder à notre catalogue et de demander un devis.</p>
     <div id="human-check" class="human-check">
       <div class="human-check-row">
-        <input type="checkbox" id="human-checkbox">
+        <input type="checkbox" id="human-checkbox" autocomplete="off">
         <label for="human-checkbox">Je ne suis pas un robot</label>
         <span class="human-check-badge">SOCOM · VÉRIFICATION</span>
       </div>
@@ -287,7 +287,7 @@ body.adm-editing img:hover{outline:2px dashed var(--red);outline-offset:2px;}
       </div>
       <p id="human-check-msg" class="human-check-msg"></p>
     </div>
-    <form id="gate-form" class="gate-form gate-form-locked">
+    <form id="gate-form" class="gate-form gate-form-locked" autocomplete="off">
       <div class="field"><label>Nom complet</label><input type="text" id="g-name" placeholder="Votre nom" required></div>
       <div class="field"><label>Téléphone</label><input type="tel" id="g-phone" placeholder="+237 ..." required></div>
       <div class="field"><label>Email (optionnel)</label><input type="email" id="g-email" placeholder="vous@exemple.com"></div>
@@ -656,6 +656,16 @@ function initHumanCheck(){
   const msg = document.getElementById("human-check-msg");
   const gateForm = document.getElementById("gate-form");
   if(!checkbox) return;
+
+  // Certains navigateurs mobiles restaurent l'état d'une case cochée après un
+  // retour/rechargement sans déclencher d'évènement "change". On repart donc
+  // toujours d'un état propre et décoché au chargement de la page.
+  checkbox.checked = false;
+  challenge.classList.remove("show");
+  gateForm.classList.remove("gate-form-unlocked");
+  gateForm.classList.add("gate-form-locked");
+  msg.textContent = "";
+
   let n1, n2;
   function newChallenge(){
     n1 = Math.floor(Math.random()*8)+1;
