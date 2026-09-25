@@ -713,17 +713,6 @@ function initGate(){
     e.preventDefault();
     if(!humanVerified) return;
 
-    const name = document.getElementById("g-name").value;
-    const phone = document.getElementById("g-phone").value;
-    const email = document.getElementById("g-email").value;
-
-    // Envoie les coordonnées du visiteur à SOCOM par e-mail avant d'ouvrir le site.
-    const body = encodeURIComponent(
-      `Nouveau visiteur sur le site SOCOM :\n\nNom: ${name}\nTéléphone: ${phone}\nEmail: ${email || "(non renseigné)"}`
-    );
-    const mailtoLink = `mailto:${SOCOM_EMAIL}?subject=${encodeURIComponent("Nouvelle inscription - site SOCOM")}&body=${body}`;
-    window.location.href = mailtoLink;
-
     try { localStorage.setItem(GATE_STORAGE_KEY, "1"); } catch(err){}
 
     closeGate();
@@ -943,6 +932,24 @@ function admExport(){
   URL.revokeObjectURL(url);
 }
 
+function admLockDown(){
+  // Remet tout en état verrouillé : appelé au chargement normal, mais aussi
+  // à chaque réaffichage de la page (retour arrière, cache mémoire du
+  // navigateur "bfcache") pour qu'aucun état admin ne puisse survivre sans
+  // que ?admin=1 soit bien présent dans l'adresse à cet instant précis.
+  admUnlocked = false;
+  document.body.classList.remove("adm-editing");
+  document.querySelectorAll('[contenteditable="true"]').forEach(el => { el.contentEditable = "false"; });
+  document.querySelectorAll(".adm-del-btn").forEach(btn => btn.remove());
+  const toolbar = document.getElementById("adm-toolbar");
+  if(toolbar) toolbar.hidden = true;
+  const toggle = document.getElementById("adm-toggle");
+  const params = new URLSearchParams(window.location.search);
+  const hasParam = params.get("admin") === "1";
+  if(toggle) toggle.hidden = !hasParam;
+  return hasParam;
+}
+
 function initAdmin(){
   const toggle = document.getElementById("adm-toggle");
   const toolbar = document.getElementById("adm-toolbar");
@@ -953,12 +960,8 @@ function initAdmin(){
   // Le bouton admin est invisible pour tout le monde. Il n'apparaît que si
   // l'adresse contient ?admin=1 (ex: index.html?admin=1). Un visiteur normal
   // ne le voit jamais et n'a donc aucun moyen d'y tomber par hasard.
-  const params = new URLSearchParams(window.location.search);
-  if(params.get("admin") === "1"){
-    toggle.hidden = false;
-  } else {
-    return; // rien d'autre à initialiser pour un visiteur normal
-  }
+  const hasParam = admLockDown();
+  if(!hasParam) return; // rien d'autre à initialiser pour un visiteur normal
 
   toggle.addEventListener("click", () => {
     if(admUnlocked) return;
@@ -1014,6 +1017,7 @@ function initAdmin(){
 }
 
 document.addEventListener("DOMContentLoaded", initAdmin);
+window.addEventListener("pageshow", admLockDown);
 
 </script>
 </body>
