@@ -609,10 +609,11 @@ body.adm-editing img:hover{outline:2px dashed var(--red);outline-offset:2px;}
         </div>
       </div>
       <form id="contact-form">
-        <div class="field"><label>Nom complet</label><input type="text" id="c-name" placeholder="Votre nom" required></div>
-        <div class="field"><label>Téléphone</label><input type="tel" id="c-phone" placeholder="+237 ..." required></div>
-        <div class="field"><label>Votre projet</label><textarea id="c-project" placeholder="Décrivez votre besoin (plateau, citerne, charpente...)" required></textarea></div>
-        <button type="submit" class="submit-btn">Envoyer la demande par e-mail</button>
+        <div class="field"><label>Nom complet</label><input type="text" id="c-name" name="name" placeholder="Votre nom" required></div>
+        <div class="field"><label>Téléphone</label><input type="tel" id="c-phone" name="phone" placeholder="+237 ..." required></div>
+        <div class="field"><label>Votre projet</label><textarea id="c-project" name="message" placeholder="Décrivez votre besoin (plateau, citerne, charpente...)" required></textarea></div>
+        <p id="c-status" style="margin:10px 0 0;font-size:13.5px;"></p>
+        <button type="submit" class="submit-btn">Envoyer la demande</button>
         <button type="button" id="c-whatsapp-btn" class="btn-ghost" style="margin-top:10px;width:100%;background:none;cursor:pointer;color:var(--navy);border-color:var(--navy);">Envoyer via WhatsApp</button>
       </form>
     </div>
@@ -721,11 +722,15 @@ function initGate(){
   });
 }
 
-/* ===== FORMULAIRE DE CONTACT (e-mail ou WhatsApp, pas de serveur) ===== */
+/* ===== FORMULAIRE DE CONTACT (envoi direct via Formspree, sans ouvrir l'app mail) ===== */
+const FORMSPREE_ENDPOINT = "https://formspree.io/f/mzezaaag";
+
 function initContactForm(){
   const form = document.getElementById("contact-form");
   if(!form) return;
   const whatsappBtn = document.getElementById("c-whatsapp-btn");
+  const statusEl = document.getElementById("c-status");
+  const btn = form.querySelector(".submit-btn");
 
   function readForm(){
     const name = document.getElementById("c-name").value;
@@ -738,13 +743,35 @@ function initContactForm(){
     return form.reportValidity ? form.reportValidity() : true;
   }
 
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const { name, phone, project } = readForm();
-    const body = encodeURIComponent(`Nom: ${name}\nTéléphone: ${phone}\n\nProjet:\n${project}`);
-    window.location.href = `mailto:${SOCOM_EMAIL}?subject=${encodeURIComponent('Demande de devis - site SOCOM')}&body=${body}`;
-    const btn = form.querySelector(".submit-btn");
-    btn.textContent = "Ouverture de votre e-mail…";
+    if(!formIsValid()) return;
+    const originalLabel = btn.textContent;
+    btn.textContent = "Envoi en cours…";
+    btn.disabled = true;
+    statusEl.textContent = "";
+    statusEl.style.color = "";
+
+    try{
+      const res = await fetch(FORMSPREE_ENDPOINT, {
+        method: "POST",
+        headers: { "Accept": "application/json" },
+        body: new FormData(form)
+      });
+      if(res.ok){
+        statusEl.textContent = "✓ Message envoyé, merci ! Nous vous recontactons rapidement.";
+        statusEl.style.color = "var(--blue-accent)";
+        form.reset();
+      } else {
+        throw new Error("send failed");
+      }
+    } catch(err){
+      statusEl.textContent = "Échec de l'envoi. Réessayez, ou utilisez le bouton WhatsApp ci-dessous.";
+      statusEl.style.color = "var(--red)";
+    } finally {
+      btn.textContent = originalLabel;
+      btn.disabled = false;
+    }
   });
 
   if(whatsappBtn){
