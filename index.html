@@ -251,6 +251,10 @@ body.adm-editing .adm-toggle{background:var(--red);}
 body.adm-editing #site{padding-bottom:70px;}
 body.adm-editing [contenteditable="true"]:hover{outline:1.5px dashed var(--blue-accent);outline-offset:2px;cursor:text;}
 body.adm-editing img{cursor:pointer;}
+.adm-editing .service-photo,.adm-editing .real-add{cursor:pointer;}
+.adm-editing .service-photo:hover,.adm-editing .real-add:hover{outline:2px dashed var(--red);outline-offset:-2px;}
+.service-photo.has-photo svg,.service-photo.has-photo .ph-label{display:none;}
+.service-photo img.uploaded.show{display:block;}
 body.adm-editing img:hover{outline:2px dashed var(--red);outline-offset:2px;}
 
 .adm-del-btn{
@@ -633,7 +637,7 @@ body.adm-editing img:hover{outline:2px dashed var(--red);outline-offset:2px;}
 <button id="adm-toggle" class="adm-toggle" title="Espace administrateur" aria-label="Espace administrateur" hidden>⚙</button>
 <input type="file" id="adm-img-input" accept="image/*" style="display:none">
 <div id="adm-toolbar" class="adm-toolbar" hidden>
-  <span class="adm-hint">Mode édition — cliquez un texte pour le modifier, une photo pour la remplacer</span>
+  <span class="adm-hint">Mode édition — cliquez un texte pour le modifier, une photo ou un cadre « Photo à ajouter » pour choisir une image</span>
   <button type="button" id="adm-add-service">+ Activité</button>
   <button type="button" id="adm-add-real">+ Réalisation</button>
   <button type="button" id="adm-export" class="adm-export">Exporter le site (.html)</button>
@@ -854,6 +858,7 @@ const EDITABLE_SELECTOR = [
 
 let admUnlocked = false;
 let admPendingImg = null;
+let admPendingZone = null;
 
 function admSetEditable(on){
   document.querySelectorAll(EDITABLE_SELECTOR).forEach(el => {
@@ -877,19 +882,19 @@ function admAddDeleteButtons(){
   });
 }
 
-function admResizeImage(file, callback){
+function admResizeImage(file, callback, maxWidth){
   const reader = new FileReader();
   reader.onload = () => {
     const img = new Image();
     img.onload = () => {
-      const maxW = 1600;
+      const maxW = maxWidth || 1600;
       const scale = Math.min(1, maxW / img.width);
       const canvas = document.createElement("canvas");
       canvas.width = Math.round(img.width * scale);
       canvas.height = Math.round(img.height * scale);
       const ctx = canvas.getContext("2d");
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      callback(canvas.toDataURL("image/jpeg", 0.8));
+      callback(canvas.toDataURL("image/jpeg", 0.78));
     };
     img.src = reader.result;
   };
@@ -1011,6 +1016,8 @@ function initAdmin(){
       if(h3) h3.textContent = "Nouvelle activité";
       const p = clone.querySelector(".service-body p");
       if(p) p.textContent = "Décrivez cette activité ici.";
+      const ph = clone.querySelector(".service-photo");
+      if(ph){ ph.classList.remove("has-photo"); const u = ph.querySelector("img.uploaded"); if(u) u.remove(); }
     });
   });
 
@@ -1020,12 +1027,22 @@ function initAdmin(){
       if(tag) tag.textContent = "Réalisation";
       const h4 = clone.querySelector("h4");
       if(h4) h4.textContent = "Nouvelle réalisation";
+      const media = clone.querySelector(".real-media");
+      if(media){ const add = document.createElement("div"); add.className = "real-add"; media.replaceWith(add); }
     });
   });
 
   // Clic sur une image en mode édition -> remplacement par un fichier local.
   site.addEventListener("click", (e) => {
     if(!admUnlocked) return;
+    const zone = e.target.closest(".service-photo, .real-add");
+    if(zone){
+      e.preventDefault();
+      admPendingZone = zone;
+      admPendingImg = null;
+      imgInput.click();
+      return;
+    }
     const img = e.target.closest("img");
     if(!img) return;
     e.preventDefault();
@@ -1035,11 +1052,25 @@ function initAdmin(){
 
   imgInput.addEventListener("change", () => {
     const file = imgInput.files && imgInput.files[0];
-    if(!file || !admPendingImg) return;
+    if(!file || (!admPendingImg && !admPendingZone)) return;
+    const zone = admPendingZone, target = admPendingImg;
+    admPendingZone = null; admPendingImg = null;
     admResizeImage(file, (dataUrl) => {
-      admPendingImg.src = dataUrl;
-      admPendingImg = null;
-    });
+      if(target){ target.src = dataUrl; return; }
+      if(zone.classList.contains("service-photo")){
+        let img = zone.querySelector("img.uploaded");
+        if(!img){ img = document.createElement("img"); img.className = "uploaded"; zone.appendChild(img); }
+        img.alt = "Photo"; img.src = dataUrl; img.classList.add("show");
+        zone.classList.add("has-photo");
+      } else {
+        const media = document.createElement("div");
+        media.className = "real-media photo";
+        const img = document.createElement("img");
+        img.alt = "Réalisation SOCOM SARL"; img.src = dataUrl;
+        media.appendChild(img);
+        zone.replaceWith(media);
+      }
+    }, zone ? 1000 : 1600);
     imgInput.value = "";
   });
 }
